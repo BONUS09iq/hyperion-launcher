@@ -1,0 +1,54 @@
+{
+  "name": "hyperion-launcher",
+  "version": "1.0.1",
+  "description": "Custom Minecraft launcher for 1.21.4 Fabric",
+  "main": "main.mjs",
+  "type": "module",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "dependencies": {
+    "electron-updater": "^6.6.2",
+    "minecraft-launcher-core": "^3.18.2"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "com.hyperion.launcher",
+    "productName": "Hyperion Launcher",
+    "files": [
+      "main.mjs",
+      "preload.cjs",
+      "paths.mjs",
+      "fabric.mjs",
+      "mods.mjs",
+      "launcher.mjs",
+      "settings.mjs",
+      "renderer/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "buildResources": "resources",
+      "output": "dist"
+    },
+    "extraResources": [
+      {
+        "from": ".minecraft/",
+        "to": ".minecraft"
+      }
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "BONUS09iq",
+        "repo": "hyperion-launcher"
+      }
+    ]
+  }
+}

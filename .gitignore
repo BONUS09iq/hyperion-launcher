@@ -1,0 +1,18 @@
+# Node
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# Збірки
+dist/
+
+# Вбудований клієнт майна
+.minecraft/
+
+# IDE
+.vscode/
+.idea/
+
+# Система
+.DS_Store
+Thumbs.db
