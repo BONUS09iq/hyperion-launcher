@@ -26,6 +26,7 @@ function createWindow() {
     resizable: false,
     title: "Hyperion Launcher",
     backgroundColor: "#050711",
+    icon: path.join(__dirname, "resources", "icon.ico"),
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,

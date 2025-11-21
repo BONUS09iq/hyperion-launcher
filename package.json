@@ -1,6 +1,6 @@
 {
   "name": "hyperion-launcher",
-  "version": "1.0.10",
+  "version": "1.0.11",
   "description": "Custom Minecraft launcher for 1.21.4 Fabric",
   "main": "main.mjs",
   "type": "module",
@@ -46,7 +46,7 @@
     ],
     "win": {
       "target": "nsis",
-      "icon": "resources/icon.jpg"
+      "icon": "icon.ico"
     },
     "nsis": {
     "oneClick": true,
