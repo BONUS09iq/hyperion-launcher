@@ -30,7 +30,6 @@
         justify-content: center;
       }
 
-
       .app {
         width: 100%;
         max-width: 960px;
@@ -46,7 +45,6 @@
         border: 1px solid rgba(255, 255, 255, 0.04);
         backdrop-filter: blur(14px);           /* легкий блюр фону */
       }
-
 
       .launcher-header {
         display: flex;
@@ -155,7 +153,6 @@
         border: 1px solid rgba(255, 255, 255, 0.10);
         backdrop-filter: blur(18px);
       }
-
 
       .block-title {
         font-size: 12px;
@@ -380,7 +377,7 @@
 
         <main class="launcher-main">
           <section class="play-section">
-            <button id="playButton" class="play-button">ГРАТИи</button>
+            <button id="playButton" class="play-button">ГРАТИ</button>
             <div id="statusText" class="status-text">
               Готово до запуску.
             </div>
@@ -422,6 +419,20 @@
             </div>
           </section>
         </main>
+
+        <!-- Блок з версією лаунчера -->
+        <div
+          id="launcherVersionBox"
+          style="
+            position: absolute;
+            right: 24px;
+            bottom: 14px;
+            font-size: 11px;
+            color: #6e7896;
+          "
+        >
+          Версія лаунчера: <span id="launcherVersion">?</span>
+        </div>
       </div>
     </div>
 
@@ -442,6 +453,7 @@
       </div>
     </div>
 
+    <!-- ВАЖЛИВО: файл має називатись так само, як тут -->
     <script src="renderer.mjs"></script>
   </body>
 </html>

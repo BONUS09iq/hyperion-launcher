@@ -46,8 +46,7 @@ window.addEventListener("DOMContentLoaded", () => {
       const totalMb = sys?.totalMb || 8192;
       // залишаємо хоча б 1 ГБ системі
       const safeMax = Math.max(1024, totalMb - 1024);
-      const sliderMax =
-        Math.max(512, Math.floor(safeMax / 256) * 256); // кратно 256
+      const sliderMax = Math.max(512, Math.floor(safeMax / 256) * 256); // кратно 256
 
       ramSlider.max = String(sliderMax);
       ramMaxLabel.textContent = sliderMax.toString();
@@ -70,6 +69,28 @@ window.addEventListener("DOMContentLoaded", () => {
       console.error("Init error:", e);
       setStatus("Помилка завантаження налаштувань.", true);
     }
+  }
+
+  // --- ПІДПИСКА НА СТАТУС АВТООНОВЛЕННЯ ---
+
+  if (window.electronAPI?.onUpdateStatus) {
+    window.electronAPI.onUpdateStatus((message) => {
+      // все, що надсилає main через "update-status",
+      // показуємо в рядку статусу лаунчера
+      setStatus(message, false);
+    });
+  }
+
+  // --- ОТОБРАЖЕННЯ ВЕРСІЇ ЛАУНЧЕРА (якщо є елемент #launcherVersion) ---
+
+  if (window.electronAPI?.getAppVersion) {
+    window.electronAPI
+      .getAppVersion()
+      .then((ver) => {
+        const verEl = document.getElementById("launcherVersion");
+        if (verEl) verEl.textContent = ver;
+      })
+      .catch((err) => console.error("Помилка отримання версії:", err));
   }
 
   // --- обробники UI ---

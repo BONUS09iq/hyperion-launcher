@@ -54,18 +54,55 @@ app.whenReady().then(async () => {
     autoUpdater.autoDownload = true;
     autoUpdater.autoInstallOnAppQuit = true;
 
-    autoUpdater.on("update-available", () => {
-      console.log("Hyperion: знайдено нове оновлення");
+    // ---- ЛОГИ ТА СТАТУСИ ОНОВЛЕННЯ ----
+
+    autoUpdater.on("checking-for-update", () => {
+      console.log("Hyperion: перевіряю оновлення...");
       if (mainWindow) {
         mainWindow.webContents.send(
           "update-status",
-          "Знайдено нову версію лаунчера. Завантажую…"
+          "Перевірка оновлень лаунчера…"
         );
       }
     });
 
-    autoUpdater.on("update-downloaded", () => {
-      console.log("Hyperion: оновлення завантажено, буде встановлено при виході");
+    autoUpdater.on("update-available", (info) => {
+      console.log("Hyperion: знайдено нове оновлення:", info?.version);
+      if (mainWindow) {
+        mainWindow.webContents.send(
+          "update-status",
+          `Знайдено нову версію лаунчера ${info?.version}. Завантажую…`
+        );
+      }
+    });
+
+    autoUpdater.on("update-not-available", () => {
+      console.log("Hyperion: оновлень немає.");
+      if (mainWindow) {
+        mainWindow.webContents.send(
+          "update-status",
+          "Оновлень лаунчера не знайдено."
+        );
+      }
+    });
+
+    autoUpdater.on("download-progress", (p) => {
+      const percent = Math.round(p.percent || 0);
+      console.log(
+        `Hyperion: завантаження ${percent}% (${Math.round(
+          (p.transferred || 0) / 1024 / 1024
+        )}MB із ${Math.round((p.total || 0) / 1024 / 1024)}MB)`
+      );
+      if (mainWindow) {
+        mainWindow.webContents.send(
+          "update-status",
+          `Завантаження оновлення лаунчера: ${percent}%`
+        );
+      }
+    });
+
+    autoUpdater.on("update-downloaded", (info) => {
+      console.log("Hyperion: оновлення завантажено:", info?.version);
       if (mainWindow) {
         mainWindow.webContents.send(
           "update-status",
@@ -76,8 +113,15 @@ app.whenReady().then(async () => {
 
     autoUpdater.on("error", (err) => {
       console.error("Помилка автооновлення:", err);
+      if (mainWindow) {
+        mainWindow.webContents.send(
+          "update-status",
+          "Помилка автооновлення лаунчера. Деталі в логах."
+        );
+      }
     });
 
+    // Безпосередньо перевірка оновлення
     try {
       await autoUpdater.checkForUpdatesAndNotify();
     } catch (e) {
@@ -114,6 +158,11 @@ ipcMain.handle("get-system-ram", async () => {
   const totalMb = Math.round(os.totalmem() / (1024 * 1024));
   return { totalMb };
 });
+
+ipcMain.handle("get-app-version", () => {
+  return app.getVersion();
+});
+
 
 // ------------ IPC ЗАПУСК ГРИ ------------
 
