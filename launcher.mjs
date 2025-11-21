@@ -1,28 +1,28 @@
 // launcher.mjs
-import os from "os";
 import { Client } from "minecraft-launcher-core";
-import { FABRIC_VERSION_ID } from "./fabric.mjs";
 
 const launcher = new Client();
 
 /**
  * Параметри:
- *   mcDir   – папка .minecraft
- *   username – нік з лаунчера
- *   ramMb    – МБ RAM
+ *   mcDir     – папка .minecraft
+ *   username  – нік з лаунчера
+ *   ramMb     – МБ RAM
+ *   versionId – рядок типу fabric-loader-0.17.3-1.21.4
  */
-export async function launchMinecraft({ mcDir, username, ramMb }) {
+export async function launchMinecraft({ mcDir, username, ramMb, versionId }) {
   const name = username && username.trim() ? username.trim() : "Player";
+
   const maxRam = String(ramMb || 4096);
   const minRam = String(Math.min(ramMb || 4096, 2048));
 
-  // Простий офлайн-профіль (тільки для одиночки / offline-mode серверів)
+  // офлайн-профіль
   const authorization = {
     access_token: "0",
     client_token: "0",
     uuid: "0",
     name,
-    user_properties: "{}"
+    user_properties: "{}",
   };
 
   const osName =
@@ -32,32 +32,37 @@ export async function launchMinecraft({ mcDir, username, ramMb }) {
       ? "osx"
       : "linux";
 
-  // ГОЛОВНЕ: javaPath = "javaw" на Windows, щоб не відкривалась консоль
-  const javaPath =
-    process.platform === "win32" ? "javaw" : "java";
+  const javaPath = process.platform === "win32" ? "javaw" : "java";
+
+  const vid =
+    typeof versionId === "string" && versionId.length > 0
+      ? versionId
+      : "fabric-loader-0.17.3-1.21.4";
+
+  // Отримаємо версію Minecraft із рядка fabric-loader-x.y.z-<mc>
+  const parts = vid.split("-");
+  const mcVersion = parts[parts.length - 1] || "1.21.4";
 
   const opts = {
     root: mcDir,
     os: osName,
     authorization,
-    javaPath, // <-- тут ми передаємо javaPath
+    javaPath,
     version: {
-      number: "1.21.4",
+      number: mcVersion, // 1.21.4 / 1.21.8
       type: "release",
-      custom: FABRIC_VERSION_ID // "fabric-loader-0.16.9-1.21.4"
+      custom: vid, // fabric-loader-...
     },
     memory: {
       max: maxRam,
-      min: minRam
-    }
+      min: minRam,
+    },
   };
 
   launcher.removeAllListeners();
   launcher.on("debug", (e) => console.log("[MCLC DEBUG]", e));
   launcher.on("data", (e) => console.log("[GAME]", e));
-  launcher.on("close", (code) =>
-    console.log("[GAME EXIT CODE]", code)
-  );
+  launcher.on("close", (code) => console.log("[GAME EXIT CODE]", code));
 
   console.log("=== Launching Minecraft with options ===");
   console.log(JSON.stringify(opts, null, 2));

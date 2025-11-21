@@ -1,9 +1,10 @@
-// renderer/renderer.js
+// renderer/renderer.mjs
 
 let currentSettings = null;
 
 window.addEventListener("DOMContentLoaded", () => {
-  const playButton = document.getElementById("playButton");
+  const playButton1218 = document.getElementById("playButton1218");
+  const playButton1214 = document.getElementById("playButton1214");
   const statusText = document.getElementById("statusText");
   const usernameInput = document.getElementById("usernameInput");
 
@@ -16,13 +17,16 @@ window.addEventListener("DOMContentLoaded", () => {
   const settingsCloseButton = document.getElementById("settingsCloseButton");
   const closeOnPlayCheckbox = document.getElementById("closeOnPlayCheckbox");
 
+  const launcherVersionLabel = document.getElementById("launcherVersion");
+
   function setStatus(text, isError = false) {
     statusText.textContent = text;
     statusText.classList.toggle("error", !!isError);
   }
 
   function setBusy(isBusy) {
-    playButton.disabled = isBusy;
+    playButton1218.disabled = isBusy;
+    playButton1214.disabled = isBusy;
   }
 
   async function saveSettings(partial) {
@@ -38,15 +42,19 @@ window.addEventListener("DOMContentLoaded", () => {
 
   async function init() {
     try {
-      const [settings, sys] = await Promise.all([
+      const [settings, sys, appVersion] = await Promise.all([
         window.electronAPI.getSettings(),
         window.electronAPI.getSystemRam(),
+        window.electronAPI.getAppVersion().catch(() => null),
       ]);
 
+      if (launcherVersionLabel) {
+        launcherVersionLabel.textContent = appVersion || "?";
+      }
+
       const totalMb = sys?.totalMb || 8192;
-      // залишаємо хоча б 1 ГБ системі
       const safeMax = Math.max(1024, totalMb - 1024);
-      const sliderMax = Math.max(512, Math.floor(safeMax / 256) * 256); // кратно 256
+      const sliderMax = Math.max(512, Math.floor(safeMax / 256) * 256);
 
       ramSlider.max = String(sliderMax);
       ramMaxLabel.textContent = sliderMax.toString();
@@ -65,42 +73,26 @@ window.addEventListener("DOMContentLoaded", () => {
         ramMb: ramFromSettings,
         closeOnPlay: !!settings.closeOnPlay,
       };
+
+      // слухаємо статуси автооновлення
+      window.electronAPI.onUpdateStatus((message) => {
+        // не помилка, просто інфо
+        setStatus(message, false);
+      });
     } catch (e) {
       console.error("Init error:", e);
       setStatus("Помилка завантаження налаштувань.", true);
     }
   }
 
-  // --- ПІДПИСКА НА СТАТУС АВТООНОВЛЕННЯ ---
-
-  if (window.electronAPI?.onUpdateStatus) {
-    window.electronAPI.onUpdateStatus((message) => {
-      // все, що надсилає main через "update-status",
-      // показуємо в рядку статусу лаунчера
-      setStatus(message, false);
-    });
-  }
-
-  // --- ОТОБРАЖЕННЯ ВЕРСІЇ ЛАУНЧЕРА (якщо є елемент #launcherVersion) ---
-
-  if (window.electronAPI?.getAppVersion) {
-    window.electronAPI
-      .getAppVersion()
-      .then((ver) => {
-        const verEl = document.getElementById("launcherVersion");
-        if (verEl) verEl.textContent = ver;
-      })
-      .catch((err) => console.error("Помилка отримання версії:", err));
-  }
-
-  // --- обробники UI ---
-
+  // --- RAM слайдер ---
   ramSlider.addEventListener("input", () => {
     const value = Number(ramSlider.value || "0");
     ramValue.textContent = value.toString();
     saveSettings({ ramMb: value });
   });
 
+  // --- нік ---
   usernameInput.addEventListener("blur", () => {
     const name = usernameInput.value.trim();
     saveSettings({ lastUsername: name });
@@ -109,11 +101,11 @@ window.addEventListener("DOMContentLoaded", () => {
   usernameInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
       e.preventDefault();
-      playButton.click();
+      playSelectedVersion("1.21.8"); // по Enter запускаємо основну версію
     }
   });
 
-  playButton.addEventListener("click", async () => {
+  async function playSelectedVersion(profile) {
     const username = usernameInput.value.trim();
     if (!username) {
       setStatus("Будь ласка, введіть нікнейм.", true);
@@ -121,15 +113,17 @@ window.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    setStatus("Запускаємо гру...", false);
+    const label =
+      profile === "1.21.8" ? "1.21.8 (Fabric 0.18.1)" : "1.21.4 (Fabric 0.17.3)";
+
+    setStatus(`Запускаємо Minecraft ${label}…`, false);
     setBusy(true);
     await saveSettings({ lastUsername: username });
 
     try {
-      const result = await window.electronAPI.play({ username });
+      const result = await window.electronAPI.play({ username, profile });
       if (result && result.ok) {
-        setStatus("Гра запускається...", false);
-        // Якщо встановлено "закривати", вікно закриється з боку main процесу
+        setStatus(`Гра запускається (${label})…`, false);
       } else {
         const msg = result?.error || "Невідома помилка.";
         setStatus("Помилка запуску: " + msg, true);
@@ -140,9 +134,13 @@ window.addEventListener("DOMContentLoaded", () => {
     } finally {
       setBusy(false);
     }
-  });
+  }
 
-  // Налаштування
+  // --- кнопки гри ---
+  playButton1218.addEventListener("click", () => playSelectedVersion("1.21.8"));
+  playButton1214.addEventListener("click", () => playSelectedVersion("1.21.4"));
+
+  // --- налаштування ---
   function openSettings() {
     settingsModal.classList.remove("hidden");
   }
@@ -160,6 +158,6 @@ window.addEventListener("DOMContentLoaded", () => {
     saveSettings({ closeOnPlay: closeOnPlayCheckbox.checked });
   });
 
-  // Старт
+  // старт
   init();
 });

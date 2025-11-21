@@ -1,5 +1,6 @@
 // main.mjs
-import { app, BrowserWindow, ipcMain } from "electron";
+import { getFabricVersionId, ensureFabricInstalled } from "./fabric.mjs";
+import { app, BrowserWindow, ipcMain, Menu } from "electron";
 import path from "path";
 import { fileURLToPath } from "url";
 import os from "os";
@@ -10,7 +11,6 @@ const { autoUpdater } = updaterPkg;
 
 import { loadSettings, saveSettings } from "./settings.mjs";
 import { getMinecraftDir } from "./paths.mjs";
-import { ensureFabricInstalled } from "./fabric.mjs";
 import { syncMods } from "./mods.mjs";
 import { launchMinecraft } from "./launcher.mjs";
 
@@ -27,6 +27,8 @@ function createWindow() {
     title: "Hyperion Launcher",
     backgroundColor: "#050711",
     icon: path.join(__dirname, "build", "icon.ico"),
+    autoHideMenuBar: true,
+    frame: true,
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
@@ -35,6 +37,9 @@ function createWindow() {
   });
 
   mainWindow.loadFile(path.join(__dirname, "renderer", "index.html"));
+
+  Menu.setApplicationMenu(null);
+  mainWindow.setMenuBarVisibility(false);
 
   mainWindow.on("closed", () => {
     mainWindow = null;
@@ -50,41 +55,32 @@ app.whenReady().then(async () => {
 
   createWindow();
 
-  // автооновлення працює ТІЛЬКИ в запакованому .exe, а не в `npm start`
   if (app.isPackaged) {
     autoUpdater.autoDownload = true;
-    autoUpdater.autoInstallOnAppQuit = true;
-
-    // ---- ЛОГИ ТА СТАТУСИ ОНОВЛЕННЯ ----
+    autoUpdater.autoInstallOnAppQuit = false;
 
     autoUpdater.on("checking-for-update", () => {
       console.log("Hyperion: перевіряю оновлення...");
-      if (mainWindow) {
-        mainWindow.webContents.send(
-          "update-status",
-          "Перевірка оновлень лаунчера…"
-        );
-      }
+      mainWindow?.webContents.send(
+        "update-status",
+        "Перевірка оновлень лаунчера…"
+      );
     });
 
     autoUpdater.on("update-available", (info) => {
       console.log("Hyperion: знайдено нове оновлення:", info?.version);
-      if (mainWindow) {
-        mainWindow.webContents.send(
-          "update-status",
-          `Знайдено нову версію лаунчера ${info?.version}. Завантажую…`
-        );
-      }
+      mainWindow?.webContents.send(
+        "update-status",
+        `Знайдено нову версію лаунчера ${info?.version}. Завантажую…`
+      );
     });
 
     autoUpdater.on("update-not-available", () => {
       console.log("Hyperion: оновлень немає.");
-      if (mainWindow) {
-        mainWindow.webContents.send(
-          "update-status",
-          "Оновлень лаунчера не знайдено."
-        );
-      }
+      mainWindow?.webContents.send(
+        "update-status",
+        "Оновлень лаунчера не знайдено."
+      );
     });
 
     autoUpdater.on("download-progress", (p) => {
@@ -94,35 +90,32 @@ app.whenReady().then(async () => {
           (p.transferred || 0) / 1024 / 1024
         )}MB із ${Math.round((p.total || 0) / 1024 / 1024)}MB)`
       );
-      if (mainWindow) {
-        mainWindow.webContents.send(
-          "update-status",
-          `Завантаження оновлення лаунчера: ${percent}%`
-        );
-      }
+      mainWindow?.webContents.send(
+        "update-status",
+        `Завантаження оновлення лаунчера: ${percent}%`
+      );
     });
 
     autoUpdater.on("update-downloaded", (info) => {
       console.log("Hyperion: оновлення завантажено:", info?.version);
-      if (mainWindow) {
-        mainWindow.webContents.send(
-          "update-status",
-          "Оновлення лаунчера завантажено. Встановиться після закриття."
-        );
-      }
+      mainWindow?.webContents.send(
+        "update-status",
+        "Оновлення завантажено. Лаунчер зараз перезапуститься для встановлення…"
+      );
+
+      setTimeout(() => {
+        autoUpdater.quitAndInstall(true);
+      }, 2500);
     });
 
     autoUpdater.on("error", (err) => {
       console.error("Помилка автооновлення:", err);
-      if (mainWindow) {
-        mainWindow.webContents.send(
-          "update-status",
-          "Помилка автооновлення лаунчера. Деталі в логах."
-        );
-      }
+      mainWindow?.webContents.send(
+        "update-status",
+        "Помилка автооновлення лаунчера. Деталі в логах."
+      );
     });
 
-    // Безпосередньо перевірка оновлення
     try {
       await autoUpdater.checkForUpdatesAndNotify();
     } catch (e) {
@@ -164,23 +157,27 @@ ipcMain.handle("get-app-version", () => {
   return app.getVersion();
 });
 
-
 // ------------ IPC ЗАПУСК ГРИ ------------
 
-ipcMain.handle("play", async (_event, { username }) => {
+ipcMain.handle("play", async (_event, { username, profile }) => {
   try {
     const settings = await loadSettings();
     const ramMb = settings.ramMb || 4096;
 
     const mcDir = getMinecraftDir();
 
-    await ensureFabricInstalled(mcDir);
-    await syncMods(mcDir);
+    // профіль: "1.21.8" або "1.21.4"
+    const selectedProfile = profile === "1.21.8" ? "1.21.8" : "1.21.4";
+    const fabricVersionId = getFabricVersionId(selectedProfile);
+
+    await ensureFabricInstalled(mcDir, fabricVersionId);
+    await syncMods(mcDir); // поки що один модпак для всіх профілів
 
     await launchMinecraft({
       mcDir,
       username,
       ramMb,
+      versionId: fabricVersionId,
     });
 
     const updated = {

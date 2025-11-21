@@ -15,9 +15,9 @@
         font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
           sans-serif;
 
-        /* Фон: скрін Minecraft */
+        /* Фон: картинка в renderer/bg-space.jpg */
         background-color: #050711;
-        background-image: url("./mc-bg.jpg");
+        background-image: url("./bg-space.jpg");
         background-position: center;
         background-size: cover;
         background-repeat: no-repeat;
@@ -38,12 +38,12 @@
 
       .launcher {
         position: relative;
-        background: rgba(6, 8, 18, 0.1);      /* напівпрозора рамка */
+        background: rgba(6, 8, 18, 0.08); /* дуже прозора центральна панель */
         border-radius: 24px;
-        padding: 24px 28px;
+        padding: 24px 28px 18px;
         box-shadow: 0 20px 60px rgba(0, 0, 0, 0.75);
-        border: 1px solid rgba(255, 255, 255, 0.04);
-        backdrop-filter: blur(14px);           /* легкий блюр фону */
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        backdrop-filter: blur(18px);
       }
 
       .launcher-header {
@@ -95,44 +95,84 @@
         padding: 24px 12px;
       }
 
+      .play-buttons-stack {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 14px;
+      }
+
       .play-button {
         width: 260px;
-        height: 110px;
         border-radius: 999px;
         border: none;
         cursor: pointer;
-        background: radial-gradient(circle at 30% 0, #5dff9c 0, #00d569 40%, #01a64f 80%);
-        color: #02040a;
         font-weight: 600;
-        font-size: 28px;
-        letter-spacing: 0.2em;
+        letter-spacing: 0.12em;
         text-transform: uppercase;
-        box-shadow: 0 0 50px rgba(0, 255, 140, 0.6);
         transition: transform 0.12s ease-out, box-shadow 0.12s ease-out,
-          filter 0.12s ease-out;
+          filter 0.12s ease-out, background 0.12s ease-out, color 0.12s ease-out,
+          border-color 0.12s ease-out;
       }
 
-      .play-button:hover {
+      /* ГОЛОВНА кнопка – 1.21.8 Fabric 0.18.1 */
+      #play1218Button {
+        height: 110px;
+        font-size: 24px;
+        background: radial-gradient(
+          circle at 30% 0,
+          #5dff9c 0,
+          #00d569 40%,
+          #01a64f 80%
+        );
+        color: #02040a;
+        box-shadow: 0 0 50px rgba(0, 255, 140, 0.6);
+      }
+
+      #play1218Button:hover {
         transform: translateY(-2px) scale(1.02);
-        box-shadow: 0 0 80px rgba(0, 255, 140, 0.8);
+        box-shadow: 0 0 80px rgba(0, 255, 140, 0.85);
         filter: brightness(1.05);
       }
 
-      .play-button:active {
+      #play1218Button:active {
         transform: translateY(1px) scale(0.98);
         box-shadow: 0 0 35px rgba(0, 255, 140, 0.5);
+      }
+
+      /* ДРУГА кнопка – 1.21.4 Fabric 0.17.3 (менш яскрава) */
+      #play1214Button {
+        height: 56px;
+        font-size: 15px;
+        background: rgba(5, 10, 20, 0.65);
+        color: #e6f6ff;
+        border: 1px solid rgba(77, 253, 155, 0.55);
+        box-shadow: 0 0 26px rgba(0, 0, 0, 0.55);
+      }
+
+      #play1214Button:hover {
+        background: rgba(10, 18, 32, 0.95);
+        transform: translateY(-1px);
+        box-shadow: 0 0 40px rgba(77, 253, 155, 0.6);
+      }
+
+      #play1214Button:active {
+        transform: translateY(1px) scale(0.98);
+        box-shadow: 0 0 26px rgba(0, 0, 0, 0.55);
       }
 
       .play-button:disabled {
         opacity: 0.6;
         cursor: default;
         box-shadow: none;
+        transform: none;
       }
 
       .status-text {
         margin-top: 16px;
         font-size: 13px;
         color: #8f9bb5;
+        text-align: center;
       }
 
       .status-text.error {
@@ -147,11 +187,11 @@
       }
 
       .block {
-        background: rgba(11, 17, 35, 0.2);     /* напівпрозорий блок */
+        background: rgba(6, 10, 26, 0.16); /* ще прозоріше */
         border-radius: 20px;
         padding: 16px 18px 18px;
-        border: 1px solid rgba(255, 255, 255, 0.10);
-        backdrop-filter: blur(18px);
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        backdrop-filter: blur(20px);
       }
 
       .block-title {
@@ -172,7 +212,7 @@
       .text-input {
         width: 100%;
         border-radius: 999px;
-        border: 1px solid rgba(255, 255, 255, 0.12);
+        border: 1px solid rgba(255, 255, 255, 0.18);
         padding: 9px 14px;
         background: rgba(3, 5, 15, 0.9);
         color: #f5f7ff;
@@ -258,6 +298,20 @@
 
       .ram-hints span:last-child {
         margin-left: auto;
+      }
+
+      /* FOOTER */
+
+      .launcher-footer {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: 10px;
+        font-size: 11px;
+        color: #737e9c;
+      }
+
+      .launcher-footer span strong {
+        color: #a8b3d3;
       }
 
       /* SETTINGS MODAL */
@@ -355,7 +409,6 @@
             class="icon-button"
             title="Налаштування лаунчера"
           >
-            <!-- іконка шестерні -->
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="18"
@@ -377,7 +430,14 @@
 
         <main class="launcher-main">
           <section class="play-section">
-            <button id="playButton" class="play-button">ГРАТИі</button>
+            <div class="play-buttons-stack">
+              <button id="play1218Button" class="play-button">
+                ГРАТИ 1.21.8
+              </button>
+              <button id="play1214Button" class="play-button">
+                ГРАТИ 1.21.4
+              </button>
+            </div>
             <div id="statusText" class="status-text">
               Готово до запуску.
             </div>
@@ -420,18 +480,8 @@
           </section>
         </main>
 
-        <!-- Блок з версією лаунчера -->
-        <div
-          id="launcherVersionBox"
-          style="
-            position: absolute;
-            right: 24px;
-            bottom: 4px;
-            font-size: 11px;
-            color: #6e7896;
-          "
-        >
-          Версія лаунчера: <span id="launcherVersion">?</span>
+        <div class="launcher-footer">
+          Версія лаунчера: <strong>&nbsp;<span id="launcherVersion">?</span></strong>
         </div>
       </div>
     </div>
@@ -453,7 +503,6 @@
       </div>
     </div>
 
-    <!-- ВАЖЛИВО: файл має називатись так само, як тут -->
     <script src="renderer.mjs"></script>
   </body>
 </html>
