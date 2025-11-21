@@ -1,11 +1,12 @@
 // main.mjs
 import { app, BrowserWindow, ipcMain } from "electron";
-import pkg from "electron-updater";           // <-- зміна
-const { autoUpdater } = pkg;                  // <-- дістаємо autoUpdater
-
 import path from "path";
 import { fileURLToPath } from "url";
 import os from "os";
+
+// electron-updater — CommonJS, тому імпорт так:
+import updaterPkg from "electron-updater";
+const { autoUpdater } = updaterPkg;
 
 import { loadSettings, saveSettings } from "./settings.mjs";
 import { getMinecraftDir } from "./paths.mjs";
@@ -39,29 +40,7 @@ function createWindow() {
   });
 }
 
-// налаштування автоапдейтера + події
-function setupAutoUpdater() {
-  autoUpdater.autoDownload = true;
-  autoUpdater.autoInstallOnAppQuit = true;
-
-  autoUpdater.on("update-available", () => {
-    if (mainWindow) {
-      mainWindow.webContents.send("update-available");
-    }
-  });
-
-  autoUpdater.on("update-downloaded", () => {
-    if (mainWindow) {
-      mainWindow.webContents.send("update-downloaded");
-    }
-  });
-
-  autoUpdater.on("error", (err) => {
-    if (mainWindow) {
-      mainWindow.webContents.send("update-error", String(err));
-    }
-  });
-}
+// ------------ AUTOUPDATE + APP READY ------------
 
 app.whenReady().then(async () => {
   if (process.platform === "win32") {
@@ -69,12 +48,43 @@ app.whenReady().then(async () => {
   }
 
   createWindow();
-  setupAutoUpdater();
 
-  try {
-    await autoUpdater.checkForUpdatesAndNotify();
-  } catch (e) {
-    console.error("Помилка перевірки оновлень:", e);
+  // автооновлення працює ТІЛЬКИ в запакованому .exe, а не в `npm start`
+  if (app.isPackaged) {
+    autoUpdater.autoDownload = true;
+    autoUpdater.autoInstallOnAppQuit = true;
+
+    autoUpdater.on("update-available", () => {
+      console.log("Hyperion: знайдено нове оновлення");
+      if (mainWindow) {
+        mainWindow.webContents.send(
+          "update-status",
+          "Знайдено нову версію лаунчера. Завантажую…"
+        );
+      }
+    });
+
+    autoUpdater.on("update-downloaded", () => {
+      console.log("Hyperion: оновлення завантажено, буде встановлено при виході");
+      if (mainWindow) {
+        mainWindow.webContents.send(
+          "update-status",
+          "Оновлення лаунчера завантажено. Встановиться після закриття."
+        );
+      }
+    });
+
+    autoUpdater.on("error", (err) => {
+      console.error("Помилка автооновлення:", err);
+    });
+
+    try {
+      await autoUpdater.checkForUpdatesAndNotify();
+    } catch (e) {
+      console.error("Помилка перевірки оновлень:", e);
+    }
+  } else {
+    console.log("Dev режим (npm start) — autoUpdater не працює.");
   }
 });
 
@@ -86,7 +96,7 @@ app.on("activate", () => {
   if (BrowserWindow.getAllWindows().length === 0) createWindow();
 });
 
-// ---------- IPC ----------
+// ------------ IPC НАЛАШТУВАННЯ ------------
 
 ipcMain.handle("get-settings", async () => {
   const settings = await loadSettings();
@@ -100,18 +110,13 @@ ipcMain.handle("save-settings", async (_event, partial) => {
   return saved;
 });
 
-// системна RAM для слайдера
 ipcMain.handle("get-system-ram", async () => {
   const totalMb = Math.round(os.totalmem() / (1024 * 1024));
   return { totalMb };
 });
 
-// перезапуск для встановлення оновлення
-ipcMain.handle("restart-to-update", () => {
-  autoUpdater.quitAndInstall();
-});
+// ------------ IPC ЗАПУСК ГРИ ------------
 
-// Play
 ipcMain.handle("play", async (_event, { username }) => {
   try {
     const settings = await loadSettings();
