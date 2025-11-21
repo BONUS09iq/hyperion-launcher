@@ -1,6 +1,6 @@
 {
   "name": "hyperion-launcher",
-  "version": "1.0.13",
+  "version": "1.0.14",
   "description": "Custom Minecraft launcher for 1.21.4 Fabric",
   "main": "main.mjs",
   "type": "module",
@@ -23,6 +23,7 @@
   "build": {
     "appId": "com.hyperion.launcher",
     "productName": "Hyperion Launcher",
+
     "files": [
       "main.mjs",
       "preload.cjs",
@@ -34,28 +35,37 @@
       "renderer/**/*",
       "package.json"
     ],
+
     "directories": {
-      "buildResources": "resources",
+      "buildResources": "build",
       "output": "dist"
     },
+
+    // ГОЛОВНА ІКОНКА ДЛЯ ЗАСТОСУНКУ
+    "icon": "build/icon.ico",
+
     "extraResources": [
       {
         "from": ".minecraft/",
         "to": ".minecraft"
       }
     ],
+
     "win": {
       "target": "nsis",
+      // шлях відносно buildResources = build/
       "icon": "icon.ico"
     },
+
     "nsis": {
-    "oneClick": true,
-    "perMachine": false,
-    "allowToChangeInstallationDirectory": false,
-    "createDesktopShortcut": "always",
-    "createStartMenuShortcut": true,
-    "shortcutName": "Hyperion Launcher"
+      "oneClick": true,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false,
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "shortcutName": "Hyperion Launcher"
     },
+
     "publish": [
       {
         "provider": "github",
