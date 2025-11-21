@@ -1,6 +1,6 @@
 {
   "name": "hyperion-launcher",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Custom Minecraft launcher for 1.21.4 Fabric",
   "main": "main.mjs",
   "type": "module",
@@ -51,7 +51,8 @@
       {
         "provider": "github",
         "owner": "BONUS09iq",
-        "repo": "hyperion-launcher"
+        "repo": "hyperion-launcher",
+        "releaseType": "release"
       }
     ]
   }
