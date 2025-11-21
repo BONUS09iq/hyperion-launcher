@@ -1,6 +1,6 @@
 {
   "name": "hyperion-launcher",
-  "version": "1.0.12",
+  "version": "1.0.13",
   "description": "Custom Minecraft launcher for 1.21.4 Fabric",
   "main": "main.mjs",
   "type": "module",
