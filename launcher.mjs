@@ -1,72 +1,70 @@
 // launcher.mjs
-import { Client } from "minecraft-launcher-core";
+import mclc from "minecraft-launcher-core";
+
+const { Client, Authenticator } = mclc;
 
 const launcher = new Client();
 
-/**
- * Параметри:
- *   mcDir     – папка .minecraft
- *   username  – нік з лаунчера
- *   ramMb     – МБ RAM
- *   versionId – рядок типу fabric-loader-0.17.3-1.21.4
- */
-export async function launchMinecraft({ mcDir, username, ramMb, versionId }) {
-  const name = username && username.trim() ? username.trim() : "Player";
+// Одна версія Fabric для обох
+const FABRIC_LOADER = "0.17.3";
 
-  const maxRam = String(ramMb || 4096);
-  const minRam = String(Math.min(ramMb || 4096, 2048));
+const PROFILES = {
+  "1.21.8": {
+    mcVersion: "1.21.8",
+    fabricId: `fabric-loader-${FABRIC_LOADER}-1.21.8`,
+  },
+  "1.21.4": {
+    mcVersion: "1.21.4",
+    fabricId: `fabric-loader-${FABRIC_LOADER}-1.21.4`,
+  },
+};
 
-  // офлайн-профіль
-  const authorization = {
-    access_token: "0",
-    client_token: "0",
-    uuid: "0",
-    name,
-    user_properties: "{}",
-  };
+export async function launchMinecraft({ mcDir, username, ramMb, profile }) {
+  const cfg = PROFILES[profile];
+  if (!cfg) {
+    throw new Error(`Невідомий профіль: ${profile}`);
+  }
 
-  const osName =
-    process.platform === "win32"
-      ? "windows"
-      : process.platform === "darwin"
-      ? "osx"
-      : "linux";
+  const { mcVersion, fabricId } = cfg;
 
-  const javaPath = process.platform === "win32" ? "javaw" : "java";
+  console.log(
+    `Hyperion: запускаю профіль ${profile} (Fabric ${fabricId}) в директорії ${mcDir}`
+  );
 
-  const vid =
-    typeof versionId === "string" && versionId.length > 0
-      ? versionId
-      : "fabric-loader-0.17.3-1.21.4";
+  const auth = Authenticator.getAuth(username || "Player");
 
-  // Отримаємо версію Minecraft із рядка fabric-loader-x.y.z-<mc>
-  const parts = vid.split("-");
-  const mcVersion = parts[parts.length - 1] || "1.21.4";
+  // чистимо старі лістерни, щоб не плодились
+  launcher.removeAllListeners();
+  launcher.on("debug", (line) => console.log("[MC DEBUG]", line));
+  launcher.on("data", (line) => console.log("[MC DATA]", line));
+  launcher.on("close", (code) =>
+    console.log("[MC CLOSE] гра завершилась, код:", code)
+  );
+  launcher.on("error", (err) => console.error("[MC ERROR event]", err));
 
   const opts = {
     root: mcDir,
-    os: osName,
-    authorization,
-    javaPath,
+    authorization: auth,
     version: {
-      number: mcVersion, // 1.21.4 / 1.21.8
+      number: mcVersion,          // базова версія MC
       type: "release",
-      custom: vid, // fabric-loader-...
+      custom: fabricId,           // custom-версія Fabric, яку створює інсталер
     },
     memory: {
-      max: maxRam,
-      min: minRam,
+      max: `${ramMb || 4096}M`,
+      min: "512M",
     },
   };
 
-  launcher.removeAllListeners();
-  launcher.on("debug", (e) => console.log("[MCLC DEBUG]", e));
-  launcher.on("data", (e) => console.log("[GAME]", e));
-  launcher.on("close", (code) => console.log("[GAME EXIT CODE]", code));
-
-  console.log("=== Launching Minecraft with options ===");
-  console.log(JSON.stringify(opts, null, 2));
-
-  const child = await launcher.launch(opts);
-  console.log("Minecraft process PID:", child && child.pid);
+  // launcher.launch може кинути синхронну помилку – ловимо її
+  try {
+    launcher.launch(opts);
+  } catch (err) {
+    console.error("[MC LAUNCH ERROR sync]", err);
+    const msg =
+      (err && err.message) ||
+      (err && err.error && err.error.message) ||
+      (typeof err === "string" ? err : JSON.stringify(err));
+    throw new Error("Помилка запуску Minecraft: " + msg);
+  }
 }

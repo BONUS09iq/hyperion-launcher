@@ -3,8 +3,8 @@
 let currentSettings = null;
 
 window.addEventListener("DOMContentLoaded", () => {
-  const playButton1218 = document.getElementById("playButton1218");
-  const playButton1214 = document.getElementById("playButton1214");
+  const play1218Button = document.getElementById("play1218");
+  const play1214Button = document.getElementById("play1214");
   const statusText = document.getElementById("statusText");
   const usernameInput = document.getElementById("usernameInput");
 
@@ -17,16 +17,17 @@ window.addEventListener("DOMContentLoaded", () => {
   const settingsCloseButton = document.getElementById("settingsCloseButton");
   const closeOnPlayCheckbox = document.getElementById("closeOnPlayCheckbox");
 
-  const launcherVersionLabel = document.getElementById("launcherVersion");
+  const launcherVersionSpan = document.getElementById("launcherVersion");
 
   function setStatus(text, isError = false) {
+    if (!statusText) return;
     statusText.textContent = text;
     statusText.classList.toggle("error", !!isError);
   }
 
   function setBusy(isBusy) {
-    playButton1218.disabled = isBusy;
-    playButton1214.disabled = isBusy;
+    if (play1218Button) play1218Button.disabled = isBusy;
+    if (play1214Button) play1214Button.disabled = isBusy;
   }
 
   async function saveSettings(partial) {
@@ -45,28 +46,36 @@ window.addEventListener("DOMContentLoaded", () => {
       const [settings, sys, appVersion] = await Promise.all([
         window.electronAPI.getSettings(),
         window.electronAPI.getSystemRam(),
-        window.electronAPI.getAppVersion().catch(() => null),
+        window.electronAPI.getAppVersion(),
       ]);
 
-      if (launcherVersionLabel) {
-        launcherVersionLabel.textContent = appVersion || "?";
+      if (launcherVersionSpan) {
+        launcherVersionSpan.textContent = appVersion || "?";
       }
 
       const totalMb = sys?.totalMb || 8192;
       const safeMax = Math.max(1024, totalMb - 1024);
       const sliderMax = Math.max(512, Math.floor(safeMax / 256) * 256);
 
-      ramSlider.max = String(sliderMax);
-      ramMaxLabel.textContent = sliderMax.toString();
+      if (ramSlider && ramMaxLabel) {
+        ramSlider.max = String(sliderMax);
+        ramMaxLabel.textContent = sliderMax.toString();
+      }
 
       let ramFromSettings = settings.ramMb || 4096;
       ramFromSettings = Math.min(Math.max(ramFromSettings, 512), sliderMax);
 
-      ramSlider.value = String(ramFromSettings);
-      ramValue.textContent = ramFromSettings.toString();
+      if (ramSlider && ramValue) {
+        ramSlider.value = String(ramFromSettings);
+        ramValue.textContent = ramFromSettings.toString();
+      }
 
-      usernameInput.value = settings.lastUsername || "";
-      closeOnPlayCheckbox.checked = !!settings.closeOnPlay;
+      if (usernameInput) {
+        usernameInput.value = settings.lastUsername || "";
+      }
+      if (closeOnPlayCheckbox) {
+        closeOnPlayCheckbox.checked = !!settings.closeOnPlay;
+      }
 
       currentSettings = {
         ...settings,
@@ -74,56 +83,62 @@ window.addEventListener("DOMContentLoaded", () => {
         closeOnPlay: !!settings.closeOnPlay,
       };
 
-      // слухаємо статуси автооновлення
-      window.electronAPI.onUpdateStatus((message) => {
-        // не помилка, просто інфо
-        setStatus(message, false);
-      });
+      // статус автооновлення від main.mjs
+      if (window.electronAPI.onUpdateStatus) {
+        window.electronAPI.onUpdateStatus((msg) => {
+          if (msg) setStatus(msg, false);
+        });
+      }
     } catch (e) {
       console.error("Init error:", e);
       setStatus("Помилка завантаження налаштувань.", true);
     }
   }
 
-  // --- RAM слайдер ---
-  ramSlider.addEventListener("input", () => {
-    const value = Number(ramSlider.value || "0");
-    ramValue.textContent = value.toString();
-    saveSettings({ ramMb: value });
-  });
+  // --- RAM у модалці ---
 
-  // --- нік ---
-  usernameInput.addEventListener("blur", () => {
-    const name = usernameInput.value.trim();
-    saveSettings({ lastUsername: name });
-  });
+  if (ramSlider && ramValue) {
+    ramSlider.addEventListener("input", () => {
+      const value = Number(ramSlider.value || "0");
+      ramValue.textContent = value.toString();
+      saveSettings({ ramMb: value });
+    });
+  }
 
-  usernameInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      playSelectedVersion("1.21.8"); // по Enter запускаємо основну версію
-    }
-  });
+  if (usernameInput) {
+    usernameInput.addEventListener("blur", () => {
+      const name = usernameInput.value.trim();
+      saveSettings({ lastUsername: name });
+    });
 
-  async function playSelectedVersion(profile) {
-    const username = usernameInput.value.trim();
+    usernameInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        // За замовчуванням запускаємо модовий 1.21.4
+        if (play1214Button) play1214Button.click();
+      }
+    });
+  }
+
+  async function startGame(profileVersion) {
+    const username = (usernameInput?.value || "").trim();
     if (!username) {
       setStatus("Будь ласка, введіть нікнейм.", true);
-      usernameInput.focus();
+      if (usernameInput) usernameInput.focus();
       return;
     }
 
-    const label =
-      profile === "1.21.8" ? "1.21.8 (Fabric 0.18.1)" : "1.21.4 (Fabric 0.17.3)";
-
-    setStatus(`Запускаємо Minecraft ${label}…`, false);
+    setStatus(`Запускаємо Minecraft ${profileVersion}…`, false);
     setBusy(true);
     await saveSettings({ lastUsername: username });
 
     try {
-      const result = await window.electronAPI.play({ username, profile });
+      const result = await window.electronAPI.play({
+        username,
+        profile: profileVersion, // "1.21.8" або "1.21.4"
+      });
       if (result && result.ok) {
-        setStatus(`Гра запускається (${label})…`, false);
+        setStatus("Гра запускається…", false);
       } else {
         const msg = result?.error || "Невідома помилка.";
         setStatus("Помилка запуску: " + msg, true);
@@ -136,28 +151,39 @@ window.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // --- кнопки гри ---
-  playButton1218.addEventListener("click", () => playSelectedVersion("1.21.8"));
-  playButton1214.addEventListener("click", () => playSelectedVersion("1.21.4"));
+  // Кнопки запуску
+  if (play1218Button) {
+    play1218Button.addEventListener("click", () => startGame("1.21.8"));
+  }
+  if (play1214Button) {
+    play1214Button.addEventListener("click", () => startGame("1.21.4"));
+  }
 
-  // --- налаштування ---
+  // Налаштування
   function openSettings() {
-    settingsModal.classList.remove("hidden");
+    if (settingsModal) settingsModal.classList.remove("hidden");
   }
   function closeSettings() {
-    settingsModal.classList.add("hidden");
+    if (settingsModal) settingsModal.classList.add("hidden");
   }
 
-  settingsButton.addEventListener("click", openSettings);
-  settingsCloseButton.addEventListener("click", closeSettings);
-  settingsModal
-    .querySelector(".modal-backdrop")
-    .addEventListener("click", closeSettings);
+  if (settingsButton) {
+    settingsButton.addEventListener("click", openSettings);
+  }
+  if (settingsCloseButton) {
+    settingsCloseButton.addEventListener("click", closeSettings);
+  }
+  if (settingsModal) {
+    const backdrop = settingsModal.querySelector(".modal-backdrop");
+    if (backdrop) backdrop.addEventListener("click", closeSettings);
+  }
 
-  closeOnPlayCheckbox.addEventListener("change", () => {
-    saveSettings({ closeOnPlay: closeOnPlayCheckbox.checked });
-  });
+  if (closeOnPlayCheckbox) {
+    closeOnPlayCheckbox.addEventListener("change", () => {
+      saveSettings({ closeOnPlay: closeOnPlayCheckbox.checked });
+    });
+  }
 
-  // старт
+  // Старт
   init();
 });

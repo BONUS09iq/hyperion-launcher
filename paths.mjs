@@ -1,22 +1,18 @@
 // paths.mjs
 import path from "path";
 import { fileURLToPath } from "url";
+import { app } from "electron";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const isPackaged = __dirname.includes("app.asar");
-
-/**
- * Папка, яку лаунчер використовує як свій .minecraft
- */
+// Папка з готовим .minecraft, який ти кладеш у корінь проєкту
+// і який electron-builder копіює як extraResources
 export function getMinecraftDir() {
-  if (isPackaged) {
-    // ВСТАНОВЛЕНИЙ ЛАУНЧЕР:
-    // C:\Users\rozen\AppData\Local\Programs\hyperion-launcher\resources\.minecraft
+  if (app.isPackaged) {
+    // у встановленому .exe
     return path.join(process.resourcesPath, ".minecraft");
-  } else {
-    // DEV (npm start): .minecraft поруч з кодом
-    return path.join(__dirname, ".minecraft");
   }
+  // у режимі npm start – .minecraft лежить поруч з main.mjs
+  return path.join(__dirname, ".minecraft");
 }

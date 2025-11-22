@@ -1,16 +1,15 @@
 // main.mjs
-import { getFabricVersionId, ensureFabricInstalled } from "./fabric.mjs";
 import { app, BrowserWindow, ipcMain, Menu } from "electron";
 import path from "path";
 import { fileURLToPath } from "url";
 import os from "os";
 
-// electron-updater — CommonJS, тому імпорт так:
 import updaterPkg from "electron-updater";
 const { autoUpdater } = updaterPkg;
 
 import { loadSettings, saveSettings } from "./settings.mjs";
 import { getMinecraftDir } from "./paths.mjs";
+import { ensureFabricInstalled } from "./fabric.mjs";
 import { syncMods } from "./mods.mjs";
 import { launchMinecraft } from "./launcher.mjs";
 
@@ -19,6 +18,18 @@ const __dirname = path.dirname(__filename);
 
 let mainWindow = null;
 
+// опис профілів (на майбутнє, якщо захочеш додати ще)
+const PROFILES = {
+  "1.21.4": { id: "1.21.4", label: "Minecraft 1.21.4 (Fabric)" },
+  "1.21.8": { id: "1.21.8", label: "Minecraft 1.21.8" },
+};
+
+function resolveProfile(profileId) {
+  const p = PROFILES[profileId];
+  if (!p) throw new Error(`Невідомий профіль версії: ${profileId}`);
+  return p;
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 960,
@@ -26,27 +37,25 @@ function createWindow() {
     resizable: false,
     title: "Hyperion Launcher",
     backgroundColor: "#050711",
-    icon: path.join(__dirname, "build", "icon.ico"),
     autoHideMenuBar: true,
-    frame: true,
+    icon: path.join(__dirname, "build", "icon.ico"),
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
     },
   });
+  
+  Menu.setApplicationMenu(null);
 
   mainWindow.loadFile(path.join(__dirname, "renderer", "index.html"));
-
-  Menu.setApplicationMenu(null);
-  mainWindow.setMenuBarVisibility(false);
 
   mainWindow.on("closed", () => {
     mainWindow = null;
   });
 }
 
-// ------------ AUTOUPDATE + APP READY ------------
+// ------------ APP READY + AUTOUPDATE ------------
 
 app.whenReady().then(async () => {
   if (process.platform === "win32") {
@@ -57,10 +66,9 @@ app.whenReady().then(async () => {
 
   if (app.isPackaged) {
     autoUpdater.autoDownload = true;
-    autoUpdater.autoInstallOnAppQuit = false;
+    autoUpdater.autoInstallOnAppQuit = true;
 
     autoUpdater.on("checking-for-update", () => {
-      console.log("Hyperion: перевіряю оновлення...");
       mainWindow?.webContents.send(
         "update-status",
         "Перевірка оновлень лаунчера…"
@@ -68,15 +76,13 @@ app.whenReady().then(async () => {
     });
 
     autoUpdater.on("update-available", (info) => {
-      console.log("Hyperion: знайдено нове оновлення:", info?.version);
       mainWindow?.webContents.send(
         "update-status",
-        `Знайдено нову версію лаунчера ${info?.version}. Завантажую…`
+        `Знайдено нове оновлення лаунчера ${info?.version}. Завантажую…`
       );
     });
 
     autoUpdater.on("update-not-available", () => {
-      console.log("Hyperion: оновлень немає.");
       mainWindow?.webContents.send(
         "update-status",
         "Оновлень лаунчера не знайдено."
@@ -85,11 +91,6 @@ app.whenReady().then(async () => {
 
     autoUpdater.on("download-progress", (p) => {
       const percent = Math.round(p.percent || 0);
-      console.log(
-        `Hyperion: завантаження ${percent}% (${Math.round(
-          (p.transferred || 0) / 1024 / 1024
-        )}MB із ${Math.round((p.total || 0) / 1024 / 1024)}MB)`
-      );
       mainWindow?.webContents.send(
         "update-status",
         `Завантаження оновлення лаунчера: ${percent}%`
@@ -97,15 +98,14 @@ app.whenReady().then(async () => {
     });
 
     autoUpdater.on("update-downloaded", (info) => {
-      console.log("Hyperion: оновлення завантажено:", info?.version);
       mainWindow?.webContents.send(
         "update-status",
-        "Оновлення завантажено. Лаунчер зараз перезапуститься для встановлення…"
+        `Оновлення ${info?.version} завантажено. Лаунчер зараз перезапуститься…`
       );
 
       setTimeout(() => {
-        autoUpdater.quitAndInstall(true);
-      }, 2500);
+        autoUpdater.quitAndInstall(false, true);
+      }, 4000);
     });
 
     autoUpdater.on("error", (err) => {
@@ -153,9 +153,7 @@ ipcMain.handle("get-system-ram", async () => {
   return { totalMb };
 });
 
-ipcMain.handle("get-app-version", () => {
-  return app.getVersion();
-});
+ipcMain.handle("get-app-version", () => app.getVersion());
 
 // ------------ IPC ЗАПУСК ГРИ ------------
 
@@ -166,18 +164,18 @@ ipcMain.handle("play", async (_event, { username, profile }) => {
 
     const mcDir = getMinecraftDir();
 
-    // профіль: "1.21.8" або "1.21.4"
-    const selectedProfile = profile === "1.21.8" ? "1.21.8" : "1.21.4";
-    const fabricVersionId = getFabricVersionId(selectedProfile);
+    // ставимо саме той Fabric, що відповідає профілю
+    await ensureFabricInstalled(mcDir, profile);
 
-    await ensureFabricInstalled(mcDir, fabricVersionId);
-    await syncMods(mcDir); // поки що один модпак для всіх профілів
+    // копіюємо правильний набір модів
+    await syncMods(mcDir, profile);
 
+    // запускаємо потрібний профіль
     await launchMinecraft({
       mcDir,
       username,
       ramMb,
-      versionId: fabricVersionId,
+      profile,
     });
 
     const updated = {
@@ -193,6 +191,9 @@ ipcMain.handle("play", async (_event, { username, profile }) => {
     return { ok: true };
   } catch (err) {
     console.error("Помилка запуску:", err);
-    return { ok: false, error: String(err.message || err) };
+    const msg =
+      (err && err.message) ||
+      (typeof err === "string" ? err : JSON.stringify(err));
+    return { ok: false, error: msg };
   }
 });
