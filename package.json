@@ -1,6 +1,6 @@
 {
   "name": "hyperion-launcher",
-  "version": "1.0.22",
+  "version": "1.0.26",
   "description": "Custom Minecraft launcher for 1.21.4 Fabric",
   "main": "main.mjs",
   "type": "module",
@@ -13,6 +13,7 @@
     "url": "https://github.com/BONUS09iq/hyperion-launcher.git"
   },
   "dependencies": {
+    "discord-rpc": "^4.0.1",
     "electron-updater": "^6.6.2",
     "minecraft-launcher-core": "^3.18.2"
   },

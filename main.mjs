@@ -13,6 +13,12 @@ import { ensureFabricInstalled } from "./fabric.mjs";
 import { syncMods } from "./mods.mjs";
 import { launchMinecraft } from "./launcher.mjs";
 
+import rpcPkg from "discord-rpc";
+const { Client, register } = rpcPkg;
+
+const DISCORD_CLIENT_ID = "1441862437451206699";
+let rpcClient = null;
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -21,7 +27,7 @@ let mainWindow = null;
 // опис профілів (на майбутнє, якщо захочеш додати ще)
 const PROFILES = {
   "1.21.4": { id: "1.21.4", label: "Minecraft 1.21.4 (Fabric)" },
-  "1.21.8": { id: "1.21.8", label: "Minecraft 1.21.8" },
+  "1.21.8": { id: "1.21.8", label: "Minecraft 1.21.8 (Fabric)" },
 };
 
 function resolveProfile(profileId) {
@@ -45,7 +51,8 @@ function createWindow() {
       nodeIntegration: false,
     },
   });
-  
+
+  // прибираємо верхнє меню
   Menu.setApplicationMenu(null);
 
   mainWindow.loadFile(path.join(__dirname, "renderer", "index.html"));
@@ -53,6 +60,47 @@ function createWindow() {
   mainWindow.on("closed", () => {
     mainWindow = null;
   });
+}
+
+// ---------- DISCORD RICH PRESENCE ----------
+
+function setDiscordActivity(stateText = "У меню лаунчера") {
+  if (!rpcClient) return;
+
+  rpcClient
+    .setActivity({
+      details: "Hyperion Launcher",
+      state: stateText,
+      largeImageKey: "hyperion_large", // ключ з Art Assets
+      largeImageText: "Hyperion Launcher",
+      smallImageKey: "hyperion_small",
+      smallImageText: "Hyperion Network",
+      startTimestamp: Date.now(),
+      instance: false,
+    })
+    .catch((err) => console.error("RPC setActivity error:", err));
+}
+
+function initDiscordRPC() {
+  try {
+    register(DISCORD_CLIENT_ID);
+    rpcClient = new Client({ transport: "ipc" });
+
+    rpcClient.on("ready", () => {
+      console.log("Discord RPC ready");
+      setDiscordActivity("У меню лаунчера");
+    });
+
+    rpcClient.on("error", (e) => {
+      console.error("Discord RPC error:", e);
+    });
+
+    rpcClient
+      .login({ clientId: DISCORD_CLIENT_ID })
+      .catch((e) => console.error("Discord RPC login failed:", e));
+  } catch (e) {
+    console.error("Discord RPC init failed:", e);
+  }
 }
 
 // ------------ APP READY + AUTOUPDATE ------------
@@ -63,6 +111,8 @@ app.whenReady().then(async () => {
   }
 
   createWindow();
+  // запускаємо Discord Rich Presence
+  initDiscordRPC();
 
   if (app.isPackaged) {
     autoUpdater.autoDownload = true;
@@ -134,6 +184,17 @@ app.on("activate", () => {
   if (BrowserWindow.getAllWindows().length === 0) createWindow();
 });
 
+// коректно закриваємо RPC при виході
+app.on("before-quit", () => {
+  if (rpcClient) {
+    try {
+      rpcClient.destroy();
+    } catch (e) {
+      console.error("RPC destroy error:", e);
+    }
+  }
+});
+
 // ------------ IPC НАЛАШТУВАННЯ ------------
 
 ipcMain.handle("get-settings", async () => {
@@ -164,18 +225,22 @@ ipcMain.handle("play", async (_event, { username, profile }) => {
 
     const mcDir = getMinecraftDir();
 
+    // якщо раптом профіль не передали – за замовчуванням 1.21.4
+    const profileId = profile || "1.21.4";
+    const profileInfo = resolveProfile(profileId);
+
     // ставимо саме той Fabric, що відповідає профілю
-    await ensureFabricInstalled(mcDir, profile);
+    await ensureFabricInstalled(mcDir, profileInfo.id);
 
     // копіюємо правильний набір модів
-    await syncMods(mcDir, profile);
+    await syncMods(mcDir, profileInfo.id);
 
     // запускаємо потрібний профіль
     await launchMinecraft({
       mcDir,
       username,
       ramMb,
-      profile,
+      profile: profileInfo.id,
     });
 
     const updated = {
@@ -183,6 +248,15 @@ ipcMain.handle("play", async (_event, { username, profile }) => {
       lastUsername: username,
     };
     await saveSettings(updated);
+
+    // Discord статус
+    if (profileInfo.id === "1.21.8") {
+      setDiscordActivity("Грає на ванільному сервері 1.21.8");
+    } else if (profileInfo.id === "1.21.4") {
+      setDiscordActivity("Грає на модовому сервері 1.21.4");
+    } else {
+      setDiscordActivity("Грає в Minecraft");
+    }
 
     if (settings.closeOnPlay && mainWindow) {
       mainWindow.close();
