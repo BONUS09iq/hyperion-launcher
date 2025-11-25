@@ -11,7 +11,9 @@ const DEFAULT_SETTINGS = {
   ramMb: 4096,
   lastUsername: "",
   minecraftDirOverride: "",
-  closeOnPlay: false
+  closeOnPlay: false,
+  skins: [],
+  currentSkinId: null
 };
 
 async function ensureDir() {
@@ -25,7 +27,7 @@ export async function loadSettings() {
     await ensureDir();
     const raw = await fs.readFile(SETTINGS_FILE, "utf8");
     const data = JSON.parse(raw);
-    return { ...DEFAULT_SETTINGS, ...data };
+    return { ...DEFAULT_SETTINGS, ...parsed };
   } catch {
     return { ...DEFAULT_SETTINGS };
   }

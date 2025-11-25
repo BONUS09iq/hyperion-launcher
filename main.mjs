@@ -1,5 +1,5 @@
 // main.mjs
-import { app, BrowserWindow, ipcMain, Menu } from "electron";
+import { app, BrowserWindow, ipcMain, Menu, dialog } from "electron";
 import path from "path";
 import { fileURLToPath } from "url";
 import os from "os";
@@ -64,12 +64,11 @@ function createWindow() {
 
 // ---------- DISCORD RICH PRESENCE ----------
 
-function setDiscordActivity(stateText = "У меню лаунчера") {
+function setDiscordActivity(stateText = "В меню лаунчера") {
   if (!rpcClient) return;
 
   rpcClient
     .setActivity({
-      details: "Hyperion Launcher",
       state: stateText,
       largeImageKey: "hyperion_large", // ключ з Art Assets
       largeImageText: "Hyperion Launcher",
@@ -88,7 +87,7 @@ function initDiscordRPC() {
 
     rpcClient.on("ready", () => {
       console.log("Discord RPC ready");
-      setDiscordActivity("У меню лаунчера");
+      setDiscordActivity("В меню лаунчера");
     });
 
     rpcClient.on("error", (e) => {
@@ -249,6 +248,8 @@ ipcMain.handle("play", async (_event, { username, profile }) => {
     };
     await saveSettings(updated);
 
+    
+
     // Discord статус
     if (profileInfo.id === "1.21.8") {
       setDiscordActivity("Грає на ванільному сервері 1.21.8");
@@ -270,4 +271,73 @@ ipcMain.handle("play", async (_event, { username, profile }) => {
       (typeof err === "string" ? err : JSON.stringify(err));
     return { ok: false, error: msg };
   }
+});
+
+// ---------- SKINS IPC ----------
+
+// Вибір PNG-файлу скіна через стандартний діалог
+ipcMain.handle("pick-skin-file", async () => {
+  if (!mainWindow) return { canceled: true };
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: "Виберіть файл скіна (PNG)",
+    filters: [{ name: "PNG skin", extensions: ["png"] }],
+    properties: ["openFile"]
+  });
+
+  if (result.canceled || !result.filePaths?.length) {
+    return { canceled: true };
+  }
+  return { canceled: false, path: result.filePaths[0] };
+});
+
+// Отримати список скінів
+ipcMain.handle("get-skins", async () => {
+  const settings = await loadSettings();
+  return {
+    skins: settings.skins || [],
+    currentSkinId: settings.currentSkinId || null,
+  };
+});
+
+// Додати скін
+ipcMain.handle("add-skin", async (_event, { name, path }) => {
+  const settings = await loadSettings();
+  const skins = settings.skins || [];
+  const id = Date.now().toString();
+
+  skins.push({ id, name, path });
+  settings.skins = skins;
+  settings.currentSkinId = id;
+
+  await saveSettings(settings);
+  return {
+    skins,
+    currentSkinId: settings.currentSkinId,
+  };
+});
+
+// Зробити скін поточним
+ipcMain.handle("set-current-skin", async (_event, { id }) => {
+  const settings = await loadSettings();
+  settings.currentSkinId = id;
+  await saveSettings(settings);
+  return {
+    skins: settings.skins || [],
+    currentSkinId: settings.currentSkinId,
+  };
+});
+
+// Видалити скін
+ipcMain.handle("remove-skin", async (_event, { id }) => {
+  const settings = await loadSettings();
+  const skins = (settings.skins || []).filter((s) => s.id !== id);
+  if (settings.currentSkinId === id) {
+    settings.currentSkinId = skins[0]?.id || null;
+  }
+  settings.skins = skins;
+  await saveSettings(settings);
+  return {
+    skins,
+    currentSkinId: settings.currentSkinId,
+  };
 });
