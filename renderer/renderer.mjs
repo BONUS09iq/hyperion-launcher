@@ -204,34 +204,50 @@ window.addEventListener("DOMContentLoaded", () => {
   let currentSkinImage = null;
   let skinZoom = 1.7; // ще використовується в 2D fallback
 
-  // --- 3D Viewer (skinview3d) ---
+  // --- 3D Viewer (skinview3d) для поточного скіна ---
   let skinViewer = null;
   let skinOrbitControls = null;
+
+  // --- 3D прев’ю в бібліотеці ---
+  const skinThumbViewers = new Map();
 
   const SKINS_KEY = "hyperion_skins_v1";
 
   function loadSkinsFromStorage() {
+    // 1) Пробуємо прочитати з localStorage
     try {
       const raw = localStorage.getItem(SKINS_KEY);
-      if (!raw) {
-        skins = [];
-        return;
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          skins = parsed;
+          return;
+        }
       }
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) skins = parsed;
-      else skins = [];
     } catch (e) {
       console.warn("Не вдалось прочитати скіни з localStorage:", e);
+    }
+
+    // 2) Якщо в localStorage нічого — пробуємо взяти з settings.json
+    if (currentSettings && Array.isArray(currentSettings.skins)) {
+      skins = currentSettings.skins;
+    } else {
       skins = [];
     }
   }
 
   function saveSkinsToStorage() {
+    // localStorage
     try {
       localStorage.setItem(SKINS_KEY, JSON.stringify(skins));
     } catch (e) {
-      console.warn("Не вдалось зберегти скіни:", e);
+      console.warn("Не вдалось зберегти скіни в localStorage:", e);
     }
+
+    // дублюємо в settings.json (через IPC)
+    saveSettings({ skins }).catch((e) =>
+      console.warn("Не вдалось зберегти скіни в settings:", e)
+    );
   }
 
   function disposeSkinViewer() {
@@ -244,6 +260,17 @@ window.addEventListener("DOMContentLoaded", () => {
       skinViewer = null;
       skinOrbitControls = null;
     }
+  }
+
+  function disposeThumbViewers() {
+    for (const viewer of skinThumbViewers.values()) {
+      try {
+        viewer.dispose();
+      } catch (e) {
+        console.warn("Помилка dispose прев’ю:", e);
+      }
+    }
+    skinThumbViewers.clear();
   }
 
   function renderEmptySkinCanvas() {
@@ -278,6 +305,9 @@ window.addEventListener("DOMContentLoaded", () => {
 
   function rebuildSkinsGrid() {
     if (!skinsGrid) return;
+
+    // При кожному перебудуванні — чистимо старі прев’ю
+    disposeThumbViewers();
     skinsGrid.innerHTML = "";
 
     if (skins.length === 0) {
@@ -293,10 +323,40 @@ window.addEventListener("DOMContentLoaded", () => {
       card.className = "skin-card";
       if (skin.id === currentSkinId) card.classList.add("active");
 
-      const img = document.createElement("img");
-      img.className = "skin-img";
-      img.src = skin.dataUrl;
-      img.alt = skin.name || "skin";
+      // 3D прев’ю / або fallback-картинка
+      const thumbWrapper = document.createElement("div");
+      thumbWrapper.className = "skin-thumb-wrapper";
+
+      const thumbCanvas = document.createElement("canvas");
+      thumbCanvas.width = 70;
+      thumbCanvas.height = 100;
+      thumbCanvas.className = "skin-thumb-canvas";
+      thumbWrapper.appendChild(thumbCanvas);
+
+      if (window.skinview3d) {
+        try {
+          const { SkinViewer } = window.skinview3d;
+          const viewer = new SkinViewer({
+            canvas: thumbCanvas,
+            width: thumbCanvas.width,
+            height: thumbCanvas.height,
+            skin: skin.dataUrl,
+          });
+          viewer.zoom = 0.9;
+          viewer.autoRotate = true;
+          skinThumbViewers.set(skin.id, viewer);
+        } catch (e) {
+          console.warn("Помилка створення прев’ю скіна:", e);
+        }
+      } else {
+        // fallback — просто текстура
+        thumbWrapper.removeChild(thumbCanvas);
+        const img = document.createElement("img");
+        img.className = "skin-img";
+        img.src = skin.dataUrl;
+        img.alt = skin.name || "skin";
+        thumbWrapper.appendChild(img);
+      }
 
       const name = document.createElement("div");
       name.className = "skin-name";
@@ -329,7 +389,7 @@ window.addEventListener("DOMContentLoaded", () => {
         setActiveSkin(skin.id);
       });
 
-      card.appendChild(img);
+      card.appendChild(thumbWrapper);
       card.appendChild(name);
       card.appendChild(removeBtn);
       skinsGrid.appendChild(card);

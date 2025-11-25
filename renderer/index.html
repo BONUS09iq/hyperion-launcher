@@ -424,6 +424,21 @@
         gap: 16px;
       }
 
+      .skin-thumb-wrapper {
+        width: 100%;
+        border-radius: 8px;
+        overflow: hidden;
+        background: #020617;
+      }
+
+      .skin-thumb-canvas {
+        display: block;
+        width: 100%;
+        height: auto;
+        image-rendering: pixelated;
+      }
+
+
       .skins-left {
         flex: 0 0 260px;
         display: flex;
@@ -470,6 +485,8 @@
         flex: 1;
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+        grid-auto-rows: max-content;
+        align-content: flex-start;
         gap: 10px;
         max-height: 260px;
         overflow-y: auto;
